@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coração ❤️</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .subtitle {
+      color: #ff8fab;
+      font-family: 'Georgia', serif;
+      font-size: 1.3rem;
+      letter-spacing: 3px;
+      margin-top: 16px;
+      opacity: 0;
+      animation: fade-in 1.5s ease 1s forwards;
+    }
+
+    @keyframes fade-in { to { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="subtitle">com amor ❤</div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx    = canvas.getContext('2d');
+
+    // ── Heart shape sampler ──────────────────────────────────────────────────
+    // Parametric heart: x = 16sin³t, y = 13cos t − 5cos 2t − 2cos 3t − cos 4t
+    function heartPoint(t) {
+      const x =  16 * Math.pow(Math.sin(t), 3);
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+      return { x, y };
+    }
+
+    // ── Build a dense cloud of points that fill the heart ────────────────────
+    function buildHeartPoints(scale, cx, cy, density) {
+      const pts = [];
+      const steps = 800;
+      for (let i = 0; i < steps; i++) {
+        const t = (i / steps) * Math.PI * 2;
+        const p = heartPoint(t);
+        pts.push({ x: cx + p.x * scale, y: cy + p.y * scale });
+      }
+
+      // Fill interior with random points that pass inside the heart
+      for (let attempt = 0; attempt < density; attempt++) {
+        const t  = Math.random() * Math.PI * 2;
+        const r  = Math.random();
+        const bx = 16 * Math.pow(Math.sin(t), 3) * r;
+        const by = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * r;
+        pts.push({ x: cx + bx * scale, y: cy + by * scale });
+      }
+      return pts;
+    }
+
+    // ── Word particle ────────────────────────────────────────────────────────
+    const words   = ['love', 'amor', 'love', 'love', 'te amo', 'love'];
+    const colors  = ['#e63946', '#ff6b8a', '#ff8fab', '#ffb3c6', '#ff4d6d', '#c9184a'];
+
+    class Word {
+      constructor(tx, ty) {
+        this.tx = tx; // target x
+        this.ty = ty; // target y
+
+        // start from a random position around the center
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = 200 + Math.random() * 300;
+        this.x = tx + Math.cos(angle) * dist;
+        this.y = ty + Math.sin(angle) * dist;
+
+        this.word    = words[Math.floor(Math.random() * words.length)];
+        this.color   = colors[Math.floor(Math.random() * colors.length)];
+        this.size    = 8 + Math.random() * 8;
+        this.delay   = Math.random() * 120; // frames
+        this.arrived = false;
+        this.alpha   = 0;
+        this.frame   = 0;
+
+        // subtle oscillation after arrival
+        this.offsetAngle = Math.random() * Math.PI * 2;
+        this.offsetSpeed = 0.01 + Math.random() * 0.02;
+        this.offsetAmp   = 0.6 + Math.random() * 1.2;
+      }
+
+      update() {
+        this.frame++;
+        if (this.frame < this.delay) return;
+
+        const progress = Math.min((this.frame - this.delay) / 60, 1);
+        const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+
+        this.x = this.x + (this.tx - this.x) * 0.06;
+        this.y = this.y + (this.ty - this.y) * 0.06;
+
+        this.alpha = Math.min(this.alpha + 0.03, 1);
+
+        if (progress >= 1) {
+          this.arrived = true;
+          this.offsetAngle += this.offsetSpeed;
+          this.x = this.tx + Math.cos(this.offsetAngle) * this.offsetAmp;
+          this.y = this.ty + Math.sin(this.offsetAngle) * this.offsetAmp;
+        }
+      }
+
+      draw(ctx) {
+        if (this.frame < this.delay) return;
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle   = this.color;
+        ctx.font        = `bold ${this.size}px Georgia, serif`;
+        ctx.textAlign   = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.word, this.x, this.y);
+        ctx.restore();
+      }
+    }
+
+    // ── Floating background particles ────────────────────────────────────────
+    class FloatParticle {
+      constructor() { this.reset(true); }
+      reset(initial) {
+        this.x     = Math.random() * canvas.width;
+        this.y     = initial ? Math.random() * canvas.height : canvas.height + 20;
+        this.speed = 0.4 + Math.random() * 0.8;
+        this.size  = 10 + Math.random() * 14;
+        this.alpha = 0;
+        this.targetAlpha = 0.4 + Math.random() * 0.4;
+        this.emoji = ['❤️','💖','💕','💗','💓'][Math.floor(Math.random()*5)];
+      }
+      update() {
+        this.y -= this.speed;
+        this.alpha = Math.min(this.alpha + 0.01, this.targetAlpha);
+        if (this.y < -20) this.reset(false);
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.font = `${this.size}px serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(this.emoji, this.x, this.y);
+        ctx.restore();
+      }
+    }
+
+    // ── Setup ────────────────────────────────────────────────────────────────
+    const SIZE = Math.min(window.innerWidth, window.innerHeight, 700);
+    canvas.width  = SIZE;
+    canvas.height = SIZE;
+
+    const scale  = SIZE / 42;
+    const cx     = SIZE / 2;
+    const cy     = SIZE / 2 + SIZE * 0.04;
+
+    const heartPts = buildHeartPoints(scale, cx, cy, 1200);
+    const wordParticles = heartPts.map(p => new Word(p.x, p.y));
+
+    const floaters = Array.from({ length: 20 }, () => new FloatParticle());
+
+    // ── Pulse scale ──────────────────────────────────────────────────────────
+    let pulseFrame = 0;
+
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // background floaters
+      floaters.forEach(f => { f.update(); f.draw(ctx); });
+
+      // pulse the whole canvas transform
+      pulseFrame++;
+      const pulse = 1 + 0.04 * Math.sin(pulseFrame * 0.04);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(pulse, pulse);
+      ctx.translate(-cx, -cy);
+
+      // word particles
+      wordParticles.forEach(w => { w.update(); w.draw(ctx); });
+
+      ctx.restore();
+
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
